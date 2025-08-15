@@ -13,6 +13,10 @@
 - type: rss
   icon: "fas fa-rss"
   noblank: true
+  
+- type: BiliBili
+  icon: https://i0.hdslb.com/bfs/archive/c8fd97a40bf79f03e7b76cbc87236f612caef7b2.png
+  url: ''
 # Uncomment and complete the url below to enable more contact options
 #
 # - type: mastodon
@@ -38,3 +42,4 @@
 # - type: threads
 #   icon: 'fa-brands fa-threads'
 #   url: ''                   # Fill with your Threads profile link
+
