@@ -5,3 +5,5 @@ source "https://rubygems.org"
 gem "jekyll"
 
 gem "jekyll-theme-chirpy", "~> 7.0"
+
+gem "html-proofer", "~> 4.4"
