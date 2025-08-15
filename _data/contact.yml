@@ -15,7 +15,7 @@
   noblank: true
   
 - type: BiliBili
-  icon: “fa-brands fa-bilibili”
+  icon: "fa-brands fa-bilibili"
   url: 'https://www.bilibili.com/'
 # Uncomment and complete the url below to enable more contact options
 #
