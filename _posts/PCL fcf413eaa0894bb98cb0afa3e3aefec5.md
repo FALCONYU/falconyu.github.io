@@ -1,0 +1,290 @@
+# PCL
+
+Owner: Chengyu Ni
+Created time: 2023年5月14日 13:41
+
+- 生成pcd文件
+    
+    包含点云的“io”库，里面包含了pcl的输入输出的函数
+    
+    1、创建点云对象“pcl::PointCloud<pcl::PointXYZ> cloud”
+    
+    这是pcl中的点云类型
+    
+    2、填充点云
+    
+    ```cpp
+    cloud.width =5;
+        cloud.height = 1; //无序点云
+        cloud.is_dense = false; //非稠密点云
+        cloud.points.resize(cloud.width * cloud.height);
+    ```
+    
+    其中宽度为5，高度为1，则该点云是一个无序点云，若高度不为1，则为有序点云，pcl中有单独收到的函数来判断点云是否为有序还是无序，不用判断cloud.height是否为1
+    
+    3、遍历点云数据，将点云数据扩充为0到1024内的点云数据
+    
+    ```cpp
+    for(auto &point :cloud)
+        {
+            point.x = 1024 * rand() / (RAND_MAX + 1.0f);
+            point.y = 1024 * rand() / (RAND_MAX + 1.0f);
+            point.z = 1024 * rand() / (RAND_MAX + 1.0f);
+    
+        }
+    ```
+    
+    auto是自动判断变量的大小和类型
+    
+    4、调用pcl中的“io”库的savePCDFileASCII函数保存点云pcd文件
+    
+    ```cpp
+    pcl::io::savePCDFileASCII("test_pcd_write.pcd", cloud);
+        std::cerr << "Saved " << cloud.size() << " data points to test_pcd_write.pcd." << std::endl;
+    
+        for(auto &point :cloud)
+        {
+            std::cerr<< "    " << point.x << " " << point.y << " " << point.z << std::endl;
+        }
+    ```
+    
+- 矩阵变换和点云可视化
+    
+    包含相应的头文件
+    
+    比如要做矩阵变换，要包含pcl/common/transform… .h.，要加载pcd文件或者加载ply文件，则要包含相应的io的头文件，pcl/io/pcd_file… .h
+    
+    1、加载pcd文件或者是ply文件
+    
+    ```cpp
+    std::vector<int> filenames;
+        bool file_is_pcd = false;
+    
+        filenames = pcl::console::parse_file_extension_argument(argc, argv, ".ply");
+    
+        if (filenames.size() != 1)
+        {
+            filenames = pcl::console::parse_file_extension_argument(argc, argv, ".pcd");
+    
+            if (filenames.size() != 1)
+            {
+                showHelp(argv[0]);
+                return -1;
+            }
+            else
+            {
+                file_is_pcd = true;
+            }
+        }
+    
+        // Load file | Works with PCD and PLY files 在参数中寻找pcd或者ply文件
+        pcl::PointCloud<pcl::PointXYZ>::Ptr source_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+    
+        if (file_is_pcd)
+        {
+            if (pcl::io::loadPCDFile(argv[filenames[0]], *source_cloud) < 0)
+            {
+                std::cout << "Error loading point cloud " << argv[filenames[0]] << std::endl
+                          << std::endl;
+                showHelp(argv[0]);
+                return -1;
+            }
+        }
+        else
+        {
+            if (pcl::io::loadPLYFile(argv[filenames[0]], *source_cloud) < 0)
+            {
+                std::cout << "Error loading point cloud " << argv[filenames[0]] << std::endl
+                          << std::endl;
+                showHelp(argv[0]);
+                return -1;
+            }
+        }
+    ```
+    
+    检查在参数中是否灿在pcd文件或者ply文件，加载到程序中
+    
+    2、创建旋转平移矩阵
+    
+    可以直接用eigen分别创建平移和旋转矩阵
+    
+    ```cpp
+    Eigen::Matrix4f transform_1 = Eigen::Matrix4f::Identity();
+    
+        // Define a rotation matrix (see https://en.wikipedia.org/wiki/Rotation_matrix)
+        float theta = M_PI / 4; // The angle of rotation in radians
+        transform_1(0, 0) = std::cos(theta);
+        transform_1(0, 1) = -sin(theta);
+        transform_1(1, 0) = sin(theta);
+        transform_1(1, 1) = std::cos(theta);
+        //    (row, column)
+    
+        // Define a translation of 2.5 meters on the x axis.
+        transform_1(0, 3) = 2.5;
+    
+        // Print the transformation
+        printf("Method #1: using a Matrix4f\n");
+        std::cout << transform_1 << std::endl;
+    ```
+    
+    也可以用Affine3f类定义矩阵，更加方便快捷
+    
+    ```cpp
+    Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
+    
+        // Define a translation of 2.5 meters on the x axis.
+        transform_2.translation() << 5, 2.5, 3;
+    
+        // The same rotation matrix as before; theta radians around Z axis
+        transform_2.rotate(Eigen::AngleAxisf(theta, Eigen::Vector3f::UnitZ()));
+    
+        Eigen::Affine3f transform_3 = Eigen::Affine3f::Identity();
+        //transform_3.translation() <<-5,-2.5,-3;
+       // transform_3.rotate(Eigen::AngleAxisf(-theta, Eigen::Vector3f::UnitZ()));
+        transform_3=transform_2.inverse();
+        printf("\nMethod #3: using an Affine3f\n");
+        std::cout << transform_3.matrix() << std::endl;
+    
+        // Print the transformation
+        printf("\nMethod #2: using an Affine3f\n");
+        std::cout << transform_2.matrix() << std::endl;
+    ```
+    
+    在这里我创建了两个矩阵分别是2和3，3是2的逆矩阵用来将变换之后的点云数据再变换回来
+    
+    变换之后如下图
+    
+    ![Untitled](PCL%20fcf413eaa0894bb98cb0afa3e3aefec5/Untitled.png)
+    
+    将其再变换回来如下图
+    
+    ![Untitled](PCL%20fcf413eaa0894bb98cb0afa3e3aefec5/Untitled%201.png)
+    
+    其中变换和点云可视化的代码如下
+    
+    ```cpp
+    pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud(new pcl::PointCloud<pcl::PointXYZ>());
+        // You can either apply transform_1 or transform_2; they are the same
+        pcl::transformPointCloud(*source_cloud, *transformed_cloud, transform_2);
+    
+        
+    
+        // Visualization  可视化
+        printf("\nPoint cloud colors :  white  = original point cloud\n"
+               "                        red  = transformed point cloud\n");
+        pcl::visualization::PCLVisualizer viewer("Matrix transformation example");
+    
+        // Define R,G,B colors for the point cloud
+        pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> source_cloud_color_handler(source_cloud, 255, 255, 255);
+        // We add the point cloud to the viewer and pass the color handler
+        viewer.addPointCloud(source_cloud, source_cloud_color_handler, "original_cloud");
+    
+        pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> transformed_cloud_color_handler(transformed_cloud, 230, 20, 20); // Red
+        viewer.addPointCloud(transformed_cloud, transformed_cloud_color_handler, "transformed_cloud");
+    
+        viewer.addCoordinateSystem(1.0, "cloud", 0);
+        viewer.setBackgroundColor(0.05, 0.05, 0.05, 0); // Setting background to a dark grey
+        viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "original_cloud");
+        viewer.setPointCloudRenderingProperties(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "transformed_cloud");
+    ```
+    
+    创建转换后的点云变量，再创建可视化的类“viewer”，创建要显示在其中的点云并定义显示的颜色，并添加进去
+    
+    最后“viewer.spinOnce();”将其不断的执行，可将点云可视化实现。
+    
+- Kdtree
+    
+    kdtree，就是一个K维的空间，将其分割为多个部分，以寻找最近点
+    
+    kd搜索有两种方式，其一；给定一个数，寻找相应个数的点，我们可以同通过设定距离的阈值来筛选最近点
+    
+    其二；给定一个搜索半径，搜索这个半径内的点，来找到最近点
+    
+    // K 临近搜索
+    //创建一个整数（设置为10）和两个向量来存储搜索到的K近邻，两个向量中，一个存储搜索到查询点近邻的索引，另一个存储对应近邻的距离平方
+    int K = 20000;
+    
+    ```cpp
+    std::vector<int> pointIdxNKNSearch(K);      //存储查询点近邻索引
+    std::vector<float> pointNKNSquaredDistance(K); //存储近邻点对应距离平方
+    //打印相关信息
+    std::cout << "K nearest neighbor search at (" << searchPoint.x
+        << " " << searchPoint.y
+        << " " << searchPoint.z
+        << ") with K=" << K << std::endl;
+    float threshold = 23;
+    if (kdtree.nearestKSearch(searchPoint, K, pointIdxNKNSearch, pointNKNSquaredDistance) > 0)  //执行K近邻搜索
+    {
+    
+        //打印所有近邻坐标
+        for (size_t i = 0; i < pointIdxNKNSearch.size(); ++i) {
+            float real_distance = std::sqrt(pointNKNSquaredDistance[i]);
+            if (real_distance <= threshold) {
+                std::cout << "    " << cloud->points[pointIdxNKNSearch[i]].x
+                    << " " << cloud->points[pointIdxNKNSearch[i]].y
+                    << " " << cloud->points[pointIdxNKNSearch[i]].z
+                    << " (squared distance: " << pointNKNSquaredDistance[i] << ")" << std::endl;
+            }
+        }
+    }
+    
+    /**********************************************************************************
+     下面的代码展示查找到给定的searchPoint的某一半径（随机产生）内所有近邻，重新定义两个向量
+     pointIdxRadiusSearch  pointRadiusSquaredDistance来存储关于近邻的信息
+     ********************************************************************************/
+     // 半径 R内近邻搜索方法
+    
+    std::vector<int> pointIdxRadiusSearch;           //存储近邻索引
+    std::vector<float> pointRadiusSquaredDistance;   //存储近邻对应距离的平方
+    
+    float radius = 256.0f * rand() / (RAND_MAX + 1.0f);   //随机的生成某一半径
+    //打印输出
+    std::cout << "Neighbors within radius search at (" << searchPoint.x
+        << " " << searchPoint.y
+        << " " << searchPoint.z
+        << ") with radius=" << radius << std::endl;
+    
+    // 假设我们的kdtree返回了大于0个近邻。那么它将打印出在我们"searchPoint"附近的10个最近的邻居并把它们存到先前创立的向量中。
+    if (kdtree.radiusSearch(searchPoint, radius, pointIdxRadiusSearch, pointRadiusSquaredDistance) > 0)  //执行半径R内近邻搜索方法
+    {
+        for (size_t i = 0; i < pointIdxRadiusSearch.size(); ++i) {
+            float real = std::sqrt(pointRadiusSquaredDistance[i]);
+            if (real <= threshold) {
+                std::cout << "    " << cloud->points[pointIdxRadiusSearch[i]].x
+                    << " " << cloud->points[pointIdxRadiusSearch[i]].y
+                    << " " << cloud->points[pointIdxRadiusSearch[i]].z
+                    << " (squared distance: " << pointRadiusSquaredDistance[i] << ")" << std::endl;
+            }
+    
+        }
+    }
+    
+    ```
+    
+- Ocrtree
+    
+    通过激光雷达、激光扫描的三维测量设备采集的点云数据，数量非常庞大，分布十分的不均匀，作为三维领域中非常重要的数据来源，点云数据主要是表面海量点的集合，并不具备网格数据的集合拓扑结构，因此点云数据处理中的最为核心的问题就是建立离散点间 的拓扑关系，是心啊基于邻域关系的快速查找
+    
+    建立空间索引在点云数据处理中有较为广泛的应用，常见的空间索引关系一般自顶而下逐级划分空间的各种空间索引结构
+    
+    BSP树、KD树、KDB树、R树、四叉树、八叉树等等
+    
+    ![Untitled](PCL%20fcf413eaa0894bb98cb0afa3e3aefec5/Untitled%202.png)
+    
+    八叉树是一个用于描述三维结构的树状数据结构，八叉树的每个节点表示一个正方体的体积元素，每个节点有八个节点，这八个节点所表示的体积元素加在一起等于父节点的体积
+    
+    - 一般中心点作为节点的分叉中心
+    - 八叉树若不为空树的话，树中任何一个节点的子节点正好会有八个，或者0个，不会有0和8以外的数
+    - 分割一直要进行到节点所对应的立方体或是完全空白，或是完全为V占据，或是其大小已是预先定义的体素大小，并且对它与V交作一定的“舍入”，使体素或认为是空白的，或认为是占据的
+    
+    实现八叉树的原理                                                                                                                              
+    
+    > (1). 设定最大递归深度。
+    (2). 找出场景的最大尺寸，并以此尺寸建立第一个立方体。
+    (3). 依序将单位元元素丢入能被包含且没有子节点的立方体。
+    (4). 若没达到最大递归深度，就进行细分八等份，再将该立方体所装的单位元元素全部分担给八个子立方体。
+    (5). 若发现子立方体所分配到的单位元元素数量不为零且跟父立方体是一样的，则该子立方体停止细分，因为跟据空间分割理论，细分的空间所得到的分配必定较少，若是一样数目，则再怎么切数目还是一样，会造成无穷切割的情形。
+    (6). 重复3，直到达到最大递归深度。
+    > 
+    
+    **pcl:Octree2BufBase< LeafContainerT, BranchContainerT >实现了同时存储管理两个八叉树与内存中，可以十分高效的实现八叉树的建立管理等操作，并实现对临近点的结构的探测，对应到空间点云，就可以对空间曲面的动态变化进行探测。**
